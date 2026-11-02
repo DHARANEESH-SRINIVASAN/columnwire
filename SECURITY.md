@@ -6,6 +6,10 @@
 |---|---|
 | 0.1.x | Yes |
 
+## Security contact
+
+Dharaneesh S, maintainer: GitHub [@DHARANEESH-SRINIVASAN](https://github.com/DHARANEESH-SRINIVASAN). Reach the maintainer privately through the reporting link below, which is monitored.
+
 ## Reporting a vulnerability
 
 Report vulnerabilities privately at https://github.com/DHARANEESH-SRINIVASAN/columnwire/security/advisories/new (the repository's **Security** tab, **Report a vulnerability**). Please do not open a public issue, pull request or discussion for a suspected vulnerability.
