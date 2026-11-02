@@ -7,3 +7,4 @@ dist/
 *.iml
 .vscode/
 .DS_Store
+js/demo/public/data/

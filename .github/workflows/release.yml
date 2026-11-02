@@ -31,6 +31,7 @@ jobs:
           CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
           CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
   npm:
     name: npm
@@ -52,7 +53,7 @@ jobs:
       - run: npm ci
       - run: npm test
       - name: Set version from tag
-        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version -w columnwire
+        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version -w columnwire
       - run: npm run build
       - name: Publish with provenance
         run: npm publish -w columnwire --provenance --access public

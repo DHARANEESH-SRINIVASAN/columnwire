@@ -13,6 +13,10 @@
 </p>
 
 <p align="center">
+  <a href="https://dharaneesh-srinivasan.github.io/columnwire/"><b>▶ Try the live demo</b></a> · 300,000 rows as JSON and as Arrow, fetched and decoded in your browser
+</p>
+
+<p align="center">
   <img src="docs/demo.png" width="820" alt="The demo loading one million rows from the same Spring Boot endpoint as JSON and as Arrow"/>
 </p>
 
@@ -163,6 +167,8 @@ A note for anyone wiring Arrow into Spring by hand: on Java 24 and newer, Arrow'
 `ArrowGrid` renders only the rows in view, plus a few above and below. It reads each visible cell with `vector.get(row)` and never materializes the table. It stays usable past the browsers' maximum element height by scaling the scroll range, so the last of two million rows is still reachable. Clicking a header sorts the whole column (numbers, dates and timestamps sort on the typed array directly), clicking again reverses, and a third click clears. It exposes `role="grid"`, `aria-rowcount` and `aria-sort`, and takes `columns`, `columnWidths`, `format` and CSS variables (`--cw-border`, `--cw-header-bg`, `--cw-row-alt`) for styling.
 
 ## Run it yourself
+
+The [live demo](https://dharaneesh-srinivasan.github.io/columnwire/) runs on static files that CI encodes with `columnwire-core` on every push. To run it against a real Spring Boot server, which streams batches while it encodes them:
 
 ```sh
 mvn -pl columnwire-example -am install -DskipTests

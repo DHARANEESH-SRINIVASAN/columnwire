@@ -15,7 +15,37 @@ interface Run {
   totalMs: number;
 }
 
-const SIZES = [10_000, 100_000, 1_000_000];
+const STATIC = import.meta.env.VITE_DATA_MODE === "static";
+const SIZES = STATIC ? [10_000, 100_000, 300_000] : [10_000, 100_000, 1_000_000];
+const DATA = `${import.meta.env.BASE_URL}data`;
+const REPO = "https://github.com/DHARANEESH-SRINIVASAN/columnwire";
+
+const jsonUrl = (count: number, run: number) =>
+  STATIC ? `${DATA}/orders-${count}.json?run=${run}` : `/api/orders?rows=${count}&run=${run}`;
+const arrowUrl = (count: number, run: number) =>
+  STATIC ? `${DATA}/orders-${count}.arrow.gz?run=${run}` : `/api/orders?rows=${count}&run=${run}`;
+
+async function gunzipIfNeeded(
+  body: ReadableStream<Uint8Array<ArrayBuffer>>,
+): Promise<ReadableStream<Uint8Array<ArrayBuffer>>> {
+  const [probe, data] = body.tee();
+  const reader = probe.getReader();
+  const { value } = await reader.read();
+  void reader.cancel();
+  const gzipped = value !== undefined && value[0] === 0x1f && value[1] === 0x8b;
+  return gzipped ? data.pipeThrough(new DecompressionStream("gzip")) : data;
+}
+
+const gunzipArrow: typeof fetch = async (input, init) => {
+  const response = await fetch(input, init);
+  if (!response.ok || !response.body) {
+    return response;
+  }
+  return new Response(await gunzipIfNeeded(response.body), {
+    status: response.status,
+    headers: { "Content-Type": ARROW_STREAM },
+  });
+};
 
 function resourceSizes(url: string) {
   const absolute = new URL(url, location.href).href;
@@ -37,7 +67,7 @@ export function App() {
   const runId = useRef(0);
 
   const loadJson = async (count: number): Promise<Run> => {
-    const url = `/api/orders?rows=${count}&run=${++runId.current}`;
+    const url = jsonUrl(count, ++runId.current);
     setStatus(`Loading ${count.toLocaleString()} rows as JSON…`);
     const started = performance.now();
     const response = await fetch(url, { headers: { Accept: "application/json" } });
@@ -48,11 +78,12 @@ export function App() {
   };
 
   const loadArrow = async (count: number): Promise<Run> => {
-    const url = `/api/orders?rows=${count}&run=${++runId.current}`;
+    const url = arrowUrl(count, ++runId.current);
     setStatus(`Streaming ${count.toLocaleString()} rows as Arrow…`);
     let frame = 0;
     const result = await fetchArrow(url, {
       headers: { Accept: ARROW_STREAM },
+      ...(STATIC ? { fetch: gunzipArrow } : {}),
       onBatch: (progress) => {
         cancelAnimationFrame(frame);
         frame = requestAnimationFrame(() => {
@@ -81,7 +112,8 @@ export function App() {
       }
       setStatus("Done. Scroll the grid or click a header to sort.");
     } catch (error) {
-      setStatus(`Failed: ${error instanceof Error ? error.message : String(error)}. Is the example app running on :8080?`);
+      const reason = error instanceof Error ? error.message : String(error);
+      setStatus(STATIC ? `Failed: ${reason}` : `Failed: ${reason}. Is the example app running on :8080?`);
     } finally {
       setBusy(false);
     }
@@ -91,7 +123,12 @@ export function App() {
     <main>
       <header>
         <h1>Columnwire</h1>
-        <p>One Spring Boot endpoint, two formats. JSON for everyone, Apache Arrow for clients that ask.</p>
+        <p>
+          {STATIC
+            ? "The same 11-column orders as JSON and as Apache Arrow, fetched and decoded in your browser. "
+            : "One Spring Boot endpoint, two formats. JSON for everyone, Apache Arrow for clients that ask. "}
+          <a href={REPO}>Source and benchmarks</a>
+        </p>
       </header>
 
       <section className="controls" aria-label="Controls">
@@ -146,6 +183,14 @@ export function App() {
             ))}
           </tbody>
         </table>
+      ) : null}
+
+      {STATIC && runs.length > 0 ? (
+        <p className="note">
+          Served as static files from GitHub Pages: JSON is gzipped by the CDN, Arrow is a pre-gzipped file unpacked
+          in the browser with DecompressionStream. A Spring Boot server with the Columnwire starter streams the
+          batches while it encodes them, which is how the README's one-million-row numbers were measured.
+        </p>
       ) : null}
 
       <ArrowGrid table={table} height={520} columnWidths={{ id: 110, quantity: 100, priority: 100, createdAt: 220 }} />

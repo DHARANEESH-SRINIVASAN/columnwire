@@ -5,6 +5,7 @@ import react from "@vitejs/plugin-react";
 const source = (file: string) => fileURLToPath(new URL(`../packages/columnwire/src/${file}`, import.meta.url));
 
 export default defineConfig({
+  base: process.env.VITE_BASE ?? "/",
   plugins: [react()],
   resolve: {
     alias: [

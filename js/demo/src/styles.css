@@ -131,3 +131,13 @@ button.primary {
 .cw-grid {
   background: var(--panel);
 }
+
+.note {
+  color: var(--muted);
+  font-size: 13px;
+  margin: -8px 0 20px;
+}
+
+a {
+  color: var(--accent);
+}

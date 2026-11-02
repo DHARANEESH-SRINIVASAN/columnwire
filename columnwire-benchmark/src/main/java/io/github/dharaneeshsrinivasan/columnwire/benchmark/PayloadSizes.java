@@ -16,11 +16,14 @@ public final class PayloadSizes {
 
     public static void main(String[] args) throws IOException {
         Path out = Path.of(args.length > 0 ? args[0] : "target/payloads");
+        int[] sizes = args.length > 1
+                ? java.util.Arrays.stream(args, 1, args.length).mapToInt(Integer::parseInt).toArray()
+                : new int[] {10_000, 100_000, 1_000_000};
         Files.createDirectories(out);
         JsonMapper json = JsonMapper.builder().build();
         System.out.println("rows,json_bytes,arrow_bytes,json_gzip_bytes,arrow_gzip_bytes");
         try (ArrowRecordEncoder arrow = new ArrowRecordEncoder()) {
-            for (int rows : new int[] {10_000, 100_000, 1_000_000}) {
+            for (int rows : sizes) {
                 List<Order> orders = Orders.generate(rows);
                 byte[] jsonBytes = json.writeValueAsBytes(orders);
                 ByteArrayOutputStream arrowOut = new ByteArrayOutputStream();

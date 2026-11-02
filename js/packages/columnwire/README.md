@@ -2,7 +2,7 @@
 
 Stream [Apache Arrow](https://arrow.apache.org/) from a Spring Boot backend into React. A fetch client that hands you each record batch as it lands, a hook, and a virtualized grid that reads columns straight from the Arrow buffers without building row objects.
 
-On one million rows in Chrome, the first rows were on screen after **103 ms with Arrow versus 6,573 ms with `fetch().json()`**. Full benchmarks and the Spring Boot side are in the [main repository](https://github.com/DHARANEESH-SRINIVASAN/columnwire).
+On one million rows in Chrome, the first rows were on screen after **103 ms with Arrow versus 6,573 ms with `fetch().json()`**. Full benchmarks and the Spring Boot side are in the [main repository](https://github.com/DHARANEESH-SRINIVASAN/columnwire). [Try the live demo](https://dharaneesh-srinivasan.github.io/columnwire/).
 
 ```sh
 npm install columnwire apache-arrow

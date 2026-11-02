@@ -1,0 +1,62 @@
+name: Live demo
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+      - name: Encode the datasets with columnwire-core
+        run: |
+          mvn -B -ntp -pl columnwire-benchmark -am install -DskipTests
+          cd columnwire-benchmark
+          mvn -B -ntp -q dependency:build-classpath -Dmdep.outputFile=target/cp.txt
+          java --add-opens=java.base/java.nio=ALL-UNNAMED --sun-misc-unsafe-memory-access=allow \
+            -cp "target/classes:$(cat target/cp.txt)" \
+            io.github.dharaneeshsrinivasan.columnwire.benchmark.PayloadSizes ../js/demo/public/data 10000 100000 300000
+          gzip -9 ../js/demo/public/data/*.arrow
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: js/package-lock.json
+      - name: Build the demo
+        working-directory: js
+        env:
+          VITE_DATA_MODE: static
+          VITE_BASE: /columnwire/
+        run: |
+          npm ci
+          npm run build -w columnwire-demo
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: js/demo/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
