@@ -4,6 +4,9 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Fixed
+- GitHub Releases now attach each module's `.pom` next to its `.pom.asc`, so every attached signature can be checked.
+
 ## [0.1.2] - 2026-11-02
 
 ### Fixed

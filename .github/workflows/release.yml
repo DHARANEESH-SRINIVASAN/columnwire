@@ -41,6 +41,9 @@ jobs:
           mkdir -p release
           cp columnwire-core/target/columnwire-core-*.jar columnwire-core/target/columnwire-core-*.asc release/
           cp columnwire-spring-boot-starter/target/columnwire-spring-boot-starter-*.jar columnwire-spring-boot-starter/target/columnwire-spring-boot-starter-*.asc release/
+          version="${GITHUB_REF_NAME#v}"
+          cp columnwire-core/pom.xml "release/columnwire-core-$version.pom"
+          cp columnwire-spring-boot-starter/pom.xml "release/columnwire-spring-boot-starter-$version.pom
       - id: attest
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
         with:
