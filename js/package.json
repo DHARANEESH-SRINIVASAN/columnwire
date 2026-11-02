@@ -1,0 +1,14 @@
+{
+  "name": "columnwire-workspace",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "demo"
+  ],
+  "scripts": {
+    "build": "npm run build -w columnwire",
+    "test": "npm run test -w columnwire",
+    "bench": "node --expose-gc bench/parse.mjs"
+  }
+}

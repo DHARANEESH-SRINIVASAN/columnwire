@@ -1,0 +1,64 @@
+{
+  "name": "columnwire",
+  "version": "0.1.0",
+  "description": "Stream Apache Arrow from a Spring Boot backend into React: a fetch client, a hook and a virtualized grid that reads columns without building row objects.",
+  "license": "Apache-2.0",
+  "author": "Dharaneesh S (https://github.com/DHARANEESH-SRINIVASAN)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DHARANEESH-SRINIVASAN/columnwire.git",
+    "directory": "js/packages/columnwire"
+  },
+  "homepage": "https://github.com/DHARANEESH-SRINIVASAN/columnwire#readme",
+  "bugs": "https://github.com/DHARANEESH-SRINIVASAN/columnwire/issues",
+  "keywords": [
+    "apache-arrow",
+    "arrow",
+    "react",
+    "spring-boot",
+    "data-grid",
+    "virtualized",
+    "streaming",
+    "columnar",
+    "fetch"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "default": "./dist/react.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "apache-arrow": ">=17",
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@testing-library/react": "16.3.3",
+    "@types/react": "19.3.0",
+    "apache-arrow": "21.2.0",
+    "jsdom": "30.1.3",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "typescript": "6.0.3",
+    "vitest": "5.0.5"
+  }
+}
