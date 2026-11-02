@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-02
+
+### Fixed
+- Release workflow: the npm job packed into a `release/` folder that did not exist, so 0.1.1 reached Maven Central but not npm or a GitHub Release. 0.1.2 ships the same code to both registries. CI now rehearses the release file handling on every pull request.
+
 ## [0.1.1] - 2026-11-02
 
 ### Added
@@ -29,6 +34,7 @@ First release.
 - npm package `columnwire`: `fetchArrow` streams record batches with a JSON fallback; `columnwire/react` adds `useArrow` and a virtualized, sortable `ArrowGrid` that reads columns without building row objects.
 - JMH and V8 benchmarks, a Java to JavaScript contract test, a Spring Boot example and a live demo.
 
-[Unreleased]: https://github.com/DHARANEESH-SRINIVASAN/columnwire/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/DHARANEESH-SRINIVASAN/columnwire/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/DHARANEESH-SRINIVASAN/columnwire/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/DHARANEESH-SRINIVASAN/columnwire/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/DHARANEESH-SRINIVASAN/columnwire/releases/tag/v0.1.0
