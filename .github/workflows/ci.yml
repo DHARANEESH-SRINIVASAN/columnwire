@@ -25,6 +25,18 @@ jobs:
           cache: maven
       - name: Build and test
         run: mvn -B -ntp verify
+      - name: Rehearse the release artifacts
+        if: matrix.java == '25'
+        run: |
+          mvn -B -ntp -P release package -Dgpg.skip=true -DskipTests -pl columnwire-core,columnwire-spring-boot-starter -am
+          mkdir -p release
+          cp columnwire-core/target/columnwire-core-*.jar columnwire-spring-boot-starter/target/columnwire-spring-boot-starter-*.jar release/
+          cp LICENSE release/LICENSE
+          for jar in release/*.jar; do
+            case "$jar" in *-javadoc.jar) continue ;; esac
+            unzip -l "$jar" | grep -q 'META-INF/LICENSE$' || { echo "$jar has no META-INF/LICENSE"; exit 1; }
+          done
+          ls -l release
 
   js:
     name: JavaScript
@@ -44,4 +56,8 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run build -w columnwire-demo
-      - run: npm pack --dry-run -w columnwire
+      - name: Rehearse the npm release pack
+        run: |
+          mkdir -p ../release
+          npm pack -w columnwire --pack-destination ../release
+          ls -l ../release/columnwire-*.tgz

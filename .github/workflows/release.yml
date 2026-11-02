@@ -76,7 +76,9 @@ jobs:
         run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version -w columnwire
       - run: npm run build
       - name: Pack
-        run: npm pack -w columnwire --pack-destination ../release
+        run: |
+          mkdir -p ../release
+          npm pack -w columnwire --pack-destination ../release
       - id: attest
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
         with:

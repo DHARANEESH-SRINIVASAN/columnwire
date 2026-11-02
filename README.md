@@ -88,7 +88,7 @@ The headline is the first-paint number: the grid starts drawing after the first 
 <dependency>
   <groupId>io.github.dharaneesh-srinivasan</groupId>
   <artifactId>columnwire-spring-boot-starter</artifactId>
-  <version>0.1.1</version>
+  <version>0.1.2</version>
 </dependency>
 ```
 
@@ -233,7 +233,7 @@ Report vulnerabilities privately, as described in [SECURITY.md](SECURITY.md). Ev
 
 ```sh
 gpg --keyserver keys.openpgp.org --recv-keys B9F051CF9545B2AB72829518908A18CEE22E2846
-gpg --verify columnwire-spring-boot-starter-0.1.1.jar.asc columnwire-spring-boot-starter-0.1.1.jar
+gpg --verify columnwire-spring-boot-starter-0.1.2.jar.asc columnwire-spring-boot-starter-0.1.2.jar
 npm audit signatures
 ```
 
