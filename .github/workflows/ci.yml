@@ -38,6 +38,16 @@ jobs:
           done
           ls -l release
 
+  workflow-scripts:
+    name: Workflow scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Check every run block with bash -n
+        run: python3 .github/scripts/check_workflow_scripts.py .github/workflows/*.yml
+
   js:
     name: JavaScript
     runs-on: ubuntu-latest
