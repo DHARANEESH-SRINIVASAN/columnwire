@@ -10,6 +10,10 @@
   <a href="https://www.npmjs.com/package/columnwire"><img src="https://img.shields.io/npm/v/columnwire?label=npm" alt="npm"/></a>
   <a href="https://www.npmjs.com/package/columnwire"><img src="https://img.shields.io/npm/dm/columnwire?label=downloads" alt="npm downloads"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="Apache-2.0"/></a>
+  <br/>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/DHARANEESH-SRINIVASAN/columnwire"><img src="https://api.scorecard.dev/projects/github.com/DHARANEESH-SRINIVASAN/columnwire/badge" alt="OpenSSF Scorecard"/></a>
+  <a href="https://github.com/DHARANEESH-SRINIVASAN/columnwire/actions/workflows/codeql.yml"><img src="https://github.com/DHARANEESH-SRINIVASAN/columnwire/actions/workflows/codeql.yml/badge.svg" alt="CodeQL"/></a>
+  <a href="https://www.npmjs.com/package/columnwire"><img src="https://img.shields.io/badge/npm-provenance-2f9e44" alt="npm provenance"/></a>
 </p>
 
 <p align="center">
@@ -220,6 +224,18 @@ js/packages/columnwire/           fetchArrow, useArrow, ArrowGrid (npm: columnwi
 js/demo/                          Vite + React comparison page
 js/bench/                         V8 decode benchmark
 ```
+
+## Security and verification
+
+Report vulnerabilities privately, as described in [SECURITY.md](SECURITY.md). Every release can be checked independently:
+
+```sh
+gpg --keyserver keys.openpgp.org --recv-keys B9F051CF9545B2AB72829518908A18CEE22E2846
+gpg --verify columnwire-spring-boot-starter-0.1.0.jar.asc columnwire-spring-boot-starter-0.1.0.jar
+npm audit signatures
+```
+
+From 0.1.1 on, release jars and the npm tarball also carry GitHub build-provenance attestations (`gh attestation verify <file> -R DHARANEESH-SRINIVASAN/columnwire`). Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md) and the [changelog](CHANGELOG.md).
 
 ## License
 
