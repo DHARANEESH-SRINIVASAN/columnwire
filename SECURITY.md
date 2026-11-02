@@ -8,9 +8,16 @@
 
 ## Reporting a vulnerability
 
-Please report vulnerabilities privately through GitHub: open the repository's **Security** tab and choose **Report a vulnerability**. Do not open a public issue.
+Report vulnerabilities privately at https://github.com/DHARANEESH-SRINIVASAN/columnwire/security/advisories/new (the repository's **Security** tab, **Report a vulnerability**). Please do not open a public issue, pull request or discussion for a suspected vulnerability.
 
-You will get an acknowledgement within 3 days and an assessment within 7. Confirmed issues are fixed in a patch release, credited to the reporter unless they prefer otherwise, and published as a GitHub security advisory.
+Include the affected version, the record type or request that triggers the problem, and the impact you observed.
+
+## Coordinated disclosure
+
+- Acknowledgement within 3 days and a first assessment within 7 days.
+- Confirmed vulnerabilities are fixed in a patch release, normally within 30 days, and disclosed through a GitHub security advisory with a CVE when one applies.
+- The reporter is credited in the advisory unless they ask not to be.
+- Please keep the details private until the advisory is published, or until 90 days after the report, whichever comes first.
 
 ## How releases are protected
 

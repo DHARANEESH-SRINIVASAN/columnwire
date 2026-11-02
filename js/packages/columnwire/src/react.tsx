@@ -359,8 +359,10 @@ export function sortOrder(vector: Vector, descending: boolean): Uint32Array {
   order.sort((a, b) => {
     const x = values[a] as number | bigint | string | boolean | null | undefined;
     const y = values[b] as number | bigint | string | boolean | null | undefined;
-    if (x == null || y == null) {
-      return x == null ? (y == null ? a - b : 1) : -1;
+    const xMissing = isMissing(x);
+    const yMissing = isMissing(y);
+    if (xMissing || yMissing) {
+      return xMissing ? (yMissing ? a - b : 1) : -1;
     }
     if (x < y) {
       return -direction;
@@ -371,6 +373,10 @@ export function sortOrder(vector: Vector, descending: boolean): Uint32Array {
     return a - b;
   });
   return order;
+}
+
+function isMissing(value: unknown): value is null | undefined {
+  return value == null || (typeof value === "number" && Number.isNaN(value));
 }
 
 function isPrimitive(type: DataType): boolean {

@@ -5,8 +5,15 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Added
-- OpenSSF Scorecard, CodeQL and Dependabot.
+- Property-based tests with fast-check: `fetchArrow` returns exactly what was encoded for random tables split into random chunk sizes, `sortOrder` is always an ordered permutation, and `formatValue` never throws.
+- OpenSSF Scorecard, CodeQL and Dependabot, every GitHub Action pinned to a commit SHA, protected `main`.
 - GitHub build-provenance attestations and a GitHub Release with signed artifacts on every tag.
+
+### Fixed
+- `ArrowGrid` sorting: `NaN` values (Java `Double.NaN`) made the comparator inconsistent, which could leave other rows out of order. `NaN` now sorts last with nulls. Found by the property tests.
+
+### Changed
+- Built with TypeScript 7.0.2. The published type declarations are identical to the 6.0 output.
 
 ## [0.1.0] - 2026-11-02
 

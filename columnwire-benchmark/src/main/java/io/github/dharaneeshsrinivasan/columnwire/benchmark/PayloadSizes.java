@@ -16,9 +16,7 @@ public final class PayloadSizes {
 
     public static void main(String[] args) throws IOException {
         Path out = Path.of(args.length > 0 ? args[0] : "target/payloads");
-        int[] sizes = args.length > 1
-                ? java.util.Arrays.stream(args, 1, args.length).mapToInt(Integer::parseInt).toArray()
-                : new int[] {10_000, 100_000, 1_000_000};
+        int[] sizes = args.length > 1 ? rowCounts(args) : new int[] {10_000, 100_000, 1_000_000};
         Files.createDirectories(out);
         JsonMapper json = JsonMapper.builder().build();
         System.out.println("rows,json_bytes,arrow_bytes,json_gzip_bytes,arrow_gzip_bytes");
@@ -35,6 +33,19 @@ public final class PayloadSizes {
                         + gzip(jsonBytes) + "," + gzip(arrowBytes));
             }
         }
+    }
+
+    private static int[] rowCounts(String[] args) {
+        int[] sizes = new int[args.length - 1];
+        for (int i = 1; i < args.length; i++) {
+            try {
+                sizes[i - 1] = Integer.parseInt(args[i]);
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("Row counts must be whole numbers, got '" + args[i]
+                        + "'. Usage: PayloadSizes <output dir> [rows...]", e);
+            }
+        }
+        return sizes;
     }
 
     private static int gzip(byte[] bytes) throws IOException {
