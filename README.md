@@ -12,6 +12,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="Apache-2.0"/></a>
   <br/>
   <a href="https://www.bestpractices.dev/projects/16203"><img src="https://www.bestpractices.dev/projects/16203/badge" alt="OpenSSF Best Practices"/></a>
+  <a href="https://www.bestpractices.dev/projects/16203"><img src="https://www.bestpractices.dev/projects/16203/baseline" alt="OpenSSF Baseline"/></a>
   <a href="https://scorecard.dev/viewer/?uri=github.com/DHARANEESH-SRINIVASAN/columnwire"><img src="https://api.scorecard.dev/projects/github.com/DHARANEESH-SRINIVASAN/columnwire/badge" alt="OpenSSF Scorecard"/></a>
   <a href="https://github.com/DHARANEESH-SRINIVASAN/columnwire/actions/workflows/codeql.yml"><img src="https://github.com/DHARANEESH-SRINIVASAN/columnwire/actions/workflows/codeql.yml/badge.svg" alt="CodeQL"/></a>
   <a href="https://www.npmjs.com/package/columnwire"><img src="https://img.shields.io/badge/npm-provenance-2f9e44" alt="npm provenance"/></a>
