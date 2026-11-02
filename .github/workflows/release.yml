@@ -41,9 +41,12 @@ jobs:
           mkdir -p release
           cp columnwire-core/target/columnwire-core-*.jar columnwire-core/target/columnwire-core-*.asc release/
           cp columnwire-spring-boot-starter/target/columnwire-spring-boot-starter-*.jar columnwire-spring-boot-starter/target/columnwire-spring-boot-starter-*.asc release/
-      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
+      - id: attest
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
         with:
           subject-path: release/*.jar
+      - name: Attach the provenance bundle
+        run: cp "${{ steps.attest.outputs.bundle-path }}" release/columnwire-maven.intoto.jsonl
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: maven-artifacts
@@ -74,9 +77,12 @@ jobs:
       - run: npm run build
       - name: Pack
         run: npm pack -w columnwire --pack-destination ../release
-      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
+      - id: attest
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
         with:
           subject-path: release/*.tgz
+      - name: Attach the provenance bundle
+        run: cp "${{ steps.attest.outputs.bundle-path }}" ../release/columnwire-npm.intoto.jsonl
       - name: Publish with provenance
         run: npm publish ../release/columnwire-*.tgz --provenance --access public
         env:
