@@ -2,10 +2,10 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.2.0] - 2026-11-03
 
 ### Added
-- JDBC queries in `columnwire-core`: `ArrowRecordEncoder.encode(ResultSet, OutputStream)` streams a `ResultSet` into Arrow record batches without building row objects. SQL types come from the result set metadata: `BOOLEAN` and `BIT(1)`, the integer types (unsigned ones widen), `REAL`, `FLOAT` and `DOUBLE`, `DECIMAL` and `NUMERIC` as Decimal128 with the column's precision and scale, the character types, `DATE`, `TIME`, `TIMESTAMP` with and without time zone, and `NULL`. Any other type fails before the first byte with the column name and its SQL type.
+- JDBC queries in `columnwire-core`: `ArrowRecordEncoder.encode(ResultSet, OutputStream)` streams a `ResultSet` into Arrow record batches without building row objects. SQL types come from the result set metadata: `BOOLEAN` and `BIT(1)`, the integer types (unsigned ones widen), `REAL`, `FLOAT` and `DOUBLE`, `DECIMAL` and `NUMERIC` as Decimal128 with the column's precision and scale, the character types, `DATE`, `TIME`, `TIMESTAMP` with and without time zone, and `NULL`. PostgreSQL `timestamptz`, which its driver reports as `TIMESTAMP`, is read with its zone. Any other type fails before the first byte with the column name and its SQL type, and `NUMERIC` without a precision (PostgreSQL `SUM` and `AVG`) and times with a time zone come with a suggested `CAST`. Checked by hand against PostgreSQL 18.6 in addition to the H2 tests.
 - `JdbcQuery.of(jdbcTemplate, sql, args...)` in the starter: return it from a controller and clients that ask for Arrow get the query streamed as Arrow, everyone else gets the same JSON as `queryForList`, written row by row. The `ResultSet`, statement and connection are closed when the response ends, fails or the client disconnects. `spring-jdbc` and `jackson-databind` are optional dependencies.
 - `ArrowGrid` and `formatValue` show Arrow decimals with their scale.
 - `JdbcBenchmark` (JMH): an in-memory H2 query streamed as Arrow against `JdbcTemplate.queryForList` with Jackson, total time, time to the first 8 KiB and allocation. A JDBC fixture for the Java to JavaScript contract test.
