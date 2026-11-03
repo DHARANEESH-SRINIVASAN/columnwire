@@ -330,6 +330,9 @@ export function formatValue(value: unknown, type?: DataType): ReactNode {
   if (typeof value === "bigint") {
     return value.toString();
   }
+  if (type && DataType.isDecimal(type) && typeof value === "object") {
+    return decimalText(String(value), type.scale);
+  }
   if (typeof value === "number" && type) {
     if (type.typeId === Type.Date) {
       return new Date(value).toISOString().slice(0, 10);
@@ -345,6 +348,15 @@ export function formatValue(value: unknown, type?: DataType): ReactNode {
     return JSON.stringify(value, (_, v: unknown) => (typeof v === "bigint" ? v.toString() : v));
   }
   return String(value);
+}
+
+function decimalText(unscaled: string, scale: number): string {
+  if (scale <= 0) {
+    return unscaled === "0" ? unscaled : unscaled + "0".repeat(-scale);
+  }
+  const negative = unscaled.startsWith("-");
+  const digits = (negative ? unscaled.slice(1) : unscaled).padStart(scale + 1, "0");
+  return `${negative ? "-" : ""}${digits.slice(0, -scale)}.${digits.slice(-scale)}`;
 }
 
 export function sortOrder(vector: Vector, descending: boolean): Uint32Array {

@@ -154,4 +154,21 @@ describe("helpers", () => {
     expect(formatValue(null)).toBe("");
     expect(formatValue(undefined)).toBe("");
   });
+
+  it("formats SQL decimals with their scale", () => {
+    const table = tableFromIPC(fixtureBytes("jdbc.arrow"));
+    const type = (name: string) => table.schema.fields.find((f) => f.name === name)!.type;
+
+    expect(formatValue(table.get(1)!.UNIT_PRICE, type("UNIT_PRICE"))).toBe("80.80");
+    expect(formatValue(table.get(1)!.REFUND, type("REFUND"))).toBe("-2585.60");
+    expect(formatValue(table.get(0)!.TOTAL, type("TOTAL"))).toBe("0.00");
+  });
+
+  it("sorts SQL decimals by value", () => {
+    const vector = tableFromIPC(fixtureBytes("jdbc.arrow")).getChild("REFUND")!;
+    const order = Array.from(sortOrder(vector, false));
+    const values = order.map((i) => Number(formatValue(vector.get(i), vector.type)));
+
+    expect(values).toEqual([...values].sort((a, b) => a - b));
+  });
 });
