@@ -16,7 +16,7 @@ public class VaryOnAcceptAdvice implements ResponseBodyAdvice<Object> {
 
     @Override
     public boolean supports(MethodParameter returnType, Class<? extends HttpMessageConverter<?>> converterType) {
-        return ArrowHttpMessageConverter.recordType(bodyType(returnType), null) != null;
+        return ArrowHttpMessageConverter.writable(bodyType(returnType), null);
     }
 
     @Override
