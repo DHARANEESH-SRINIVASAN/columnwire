@@ -1,7 +1,7 @@
 package io.github.dharaneeshsrinivasan.columnwire;
 
 @FunctionalInterface
-interface ColumnWriter {
+interface ColumnWriter<R> {
 
-    void write(Record row, int index) throws Throwable;
+    void write(R row, int index) throws Throwable;
 }

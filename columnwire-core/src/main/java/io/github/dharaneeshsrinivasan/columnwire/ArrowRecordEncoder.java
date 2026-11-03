@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -19,6 +21,7 @@ import org.apache.arrow.vector.ipc.ArrowStreamWriter;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
+import org.apache.arrow.vector.types.pojo.Schema;
 
 public final class ArrowRecordEncoder implements AutoCloseable {
 
@@ -66,20 +69,39 @@ public final class ArrowRecordEncoder implements AutoCloseable {
     public <T extends Record> EncodeResult encode(Class<T> type, Iterator<? extends T> rows, OutputStream out)
             throws IOException {
         RecordSchema<T> schema = RecordSchema.of(type);
-        List<ColumnSpec> columns = schema.columns();
+        try {
+            return encode("columnwire-" + type.getSimpleName(), schema.arrowSchema(), schema.columns(),
+                    RowCursor.of(rows), out);
+        } catch (SQLException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    public EncodeResult encode(ResultSet rows, OutputStream out) throws IOException, SQLException {
+        List<ColumnSpec<ResultSet>> columns = JdbcColumns.of(rows.getMetaData());
+        List<Field> fields = new ArrayList<>(columns.size());
+        for (ColumnSpec<ResultSet> column : columns) {
+            fields.add(column.field());
+        }
+        return encode("columnwire-jdbc", new Schema(fields), columns, RowCursor.of(rows), out);
+    }
+
+    private <R> EncodeResult encode(String name, Schema schema, List<ColumnSpec<R>> columns, RowCursor<R> rows,
+                                    OutputStream out) throws IOException, SQLException {
         List<Dictionary> dictionaries = new ArrayList<>();
-        try (BufferAllocator child = allocator.newChildAllocator("columnwire-" + type.getSimpleName(), 0, Long.MAX_VALUE);
-             VectorSchemaRoot root = VectorSchemaRoot.create(schema.arrowSchema(), child)) {
+        try (BufferAllocator child = allocator.newChildAllocator(name, 0, Long.MAX_VALUE);
+             VectorSchemaRoot root = VectorSchemaRoot.create(schema, child)) {
             try {
                 DictionaryProvider.MapDictionaryProvider provider = new DictionaryProvider.MapDictionaryProvider();
-                for (ColumnSpec column : columns) {
+                for (ColumnSpec<R> column : columns) {
                     if (column.dictionaryEncoded()) {
                         Dictionary dictionary = dictionary(column, child);
                         dictionaries.add(dictionary);
                         provider.put(dictionary);
                     }
                 }
-                ColumnWriter[] writers = new ColumnWriter[columns.size()];
+                @SuppressWarnings("unchecked")
+                ColumnWriter<R>[] writers = new ColumnWriter[columns.size()];
                 for (int c = 0; c < writers.length; c++) {
                     FieldVector vector = root.getVector(c);
                     vector.setInitialCapacity(batchSize);
@@ -94,20 +116,20 @@ public final class ArrowRecordEncoder implements AutoCloseable {
         }
     }
 
-    private EncodeResult write(Iterator<? extends Record> rows, VectorSchemaRoot root, ColumnWriter[] writers,
-                               DictionaryProvider provider, OutputStream out) throws IOException {
+    private <R> EncodeResult write(RowCursor<R> rows, VectorSchemaRoot root, ColumnWriter<R>[] writers,
+                                   DictionaryProvider provider, OutputStream out) throws IOException, SQLException {
         long total = 0;
         int batches = 0;
         try (ArrowStreamWriter writer = new ArrowStreamWriter(root, provider, new NonClosingOutputStream(out))) {
             writer.start();
             root.allocateNew();
             int n = 0;
-            while (rows.hasNext()) {
-                Record row = rows.next();
-                for (ColumnWriter w : writers) {
+            while (rows.next()) {
+                R row = rows.row();
+                for (ColumnWriter<R> w : writers) {
                     try {
                         w.write(row, n);
-                    } catch (RuntimeException | Error e) {
+                    } catch (RuntimeException | Error | SQLException e) {
                         throw e;
                     } catch (Throwable e) {
                         throw new IllegalStateException(e);
@@ -135,7 +157,7 @@ public final class ArrowRecordEncoder implements AutoCloseable {
         return new EncodeResult(total, batches);
     }
 
-    private static Dictionary dictionary(ColumnSpec column, BufferAllocator allocator) {
+    private static Dictionary dictionary(ColumnSpec<?> column, BufferAllocator allocator) {
         Field field = new Field(column.name(), FieldType.nullable(ArrowType.Utf8.INSTANCE), null);
         VarCharVector values = (VarCharVector) field.createVector(allocator);
         List<String> names = column.dictionary();
