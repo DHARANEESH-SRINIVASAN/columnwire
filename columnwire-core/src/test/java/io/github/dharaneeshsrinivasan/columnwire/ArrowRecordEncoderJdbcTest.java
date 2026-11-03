@@ -26,6 +26,7 @@ import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.ArrowStreamReader;
+import org.apache.arrow.vector.types.TimeUnit;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.junit.jupiter.api.AfterEach;
@@ -226,6 +227,41 @@ class ArrowRecordEncoderJdbcTest {
                 .hasMessageContaining("Column WIDE has SQL type")
                 .hasMessageContaining("(50, 2)")
                 .hasMessageContaining("CAST(WIDE AS DECIMAL(38, 2))");
+    }
+
+    @Test
+    void readsZonedTimestampsThatDriversReportAsPlainTimestamps() throws Exception {
+        ResultSet rows = stub(List.of(
+                new StubColumn("created", Types.TIMESTAMP, "timestamptz", 35, true),
+                new StubColumn("logged", Types.TIMESTAMP, "TIMESTAMP WITH TIME ZONE", 35, true),
+                new StubColumn("plain", Types.TIMESTAMP, "timestamp", 29, true)), 0);
+
+        List<Field> fields = schema(encode(rows, 16));
+
+        assertThat(fields).extracting(Field::getType).containsExactly(
+                new ArrowType.Timestamp(TimeUnit.MICROSECOND, "UTC"),
+                new ArrowType.Timestamp(TimeUnit.MICROSECOND, "UTC"),
+                new ArrowType.Timestamp(TimeUnit.MICROSECOND, null));
+    }
+
+    @Test
+    void rejectsZonedTimesAndSuggestsACast() {
+        ResultSet rows = stub(List.of(new StubColumn("opens", Types.TIME, "timetz", 21, true)), 0);
+
+        assertThatThrownBy(() -> encode(rows, 16))
+                .isInstanceOf(UnsupportedRecordException.class)
+                .hasMessageContaining("Column opens has SQL type TIME WITH TIME ZONE")
+                .hasMessageContaining("CAST(opens AS TIME)");
+    }
+
+    @Test
+    void rejectsDecimalsWithoutAPrecisionAndSuggestsACastOfTheExpression() {
+        ResultSet rows = stub(List.of(new StubColumn("total", Types.NUMERIC, "numeric", 0, true)), 0);
+
+        assertThatThrownBy(() -> encode(rows, 16))
+                .isInstanceOf(UnsupportedRecordException.class)
+                .hasMessageContaining("Column total has SQL type NUMERIC without a fixed precision")
+                .hasMessageContaining("CAST(SUM(price) AS DECIMAL(18, 2)) AS total");
     }
 
     @Test

@@ -12,6 +12,7 @@ import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.Function;
 import org.apache.arrow.vector.BigIntVector;
 import org.apache.arrow.vector.BitVector;
@@ -76,7 +77,13 @@ final class JdbcColumns {
             case Types.DECIMAL, Types.NUMERIC -> {
                 int precision = metadata.getPrecision(c);
                 int scale = metadata.getScale(c);
-                if (precision < 1 || precision > MAX_DECIMAL_PRECISION) {
+                if (precision < 1) {
+                    throw unsupported(metadata, c, name, sqlType(type) + " without a fixed precision",
+                            ": Arrow decimals need one, and PostgreSQL reports SUM, AVG and plain NUMERIC columns this way."
+                                    + " Cast the expression in the query, for example CAST(SUM(price) AS DECIMAL(18, 2)) AS "
+                                    + name);
+                }
+                if (precision > MAX_DECIMAL_PRECISION) {
                     throw unsupported(metadata, c, name, sqlType(type) + "(" + precision + ", " + scale + ")",
                             ": Arrow decimals hold 1 to " + MAX_DECIMAL_PRECISION + " digits. Cast it in the query,"
                                     + " for example CAST(" + name + " AS DECIMAL(" + MAX_DECIMAL_PRECISION + ", "
@@ -90,19 +97,39 @@ final class JdbcColumns {
             case Types.DATE -> object(name, nullable, new ArrowType.Date(DateUnit.DAY),
                     rs -> rs.getObject(c, LocalDate.class),
                     (v, i, o) -> ((DateDayVector) v).set(i, Math.toIntExact(((LocalDate) o).toEpochDay())));
-            case Types.TIME -> object(name, nullable, new ArrowType.Time(TimeUnit.MICROSECOND, 64),
-                    rs -> rs.getObject(c, LocalTime.class),
-                    (v, i, o) -> ((TimeMicroVector) v).set(i, ((LocalTime) o).toNanoOfDay() / 1_000L));
-            case Types.TIMESTAMP -> object(name, nullable, new ArrowType.Timestamp(TimeUnit.MICROSECOND, null),
-                    rs -> rs.getObject(c, LocalDateTime.class),
-                    (v, i, o) -> ((TimeStampMicroVector) v).set(i, Columns.micros((LocalDateTime) o)));
-            case Types.TIMESTAMP_WITH_TIMEZONE -> object(name, nullable,
-                    new ArrowType.Timestamp(TimeUnit.MICROSECOND, "UTC"), rs -> rs.getObject(c, OffsetDateTime.class),
-                    (v, i, o) -> ((TimeStampMicroTZVector) v).set(i, Columns.micros(((OffsetDateTime) o).toInstant())));
+            case Types.TIME -> {
+                if (zoned(metadata, c)) {
+                    throw unsupported(metadata, c, name, "TIME WITH TIME ZONE",
+                            ": Arrow times have no zone. Cast it in the query, for example CAST(" + name + " AS TIME)");
+                }
+                yield object(name, nullable, new ArrowType.Time(TimeUnit.MICROSECOND, 64),
+                        rs -> rs.getObject(c, LocalTime.class),
+                        (v, i, o) -> ((TimeMicroVector) v).set(i, ((LocalTime) o).toNanoOfDay() / 1_000L));
+            }
+            case Types.TIMESTAMP -> zoned(metadata, c) ? timestampWithZone(name, nullable, c)
+                    : object(name, nullable, new ArrowType.Timestamp(TimeUnit.MICROSECOND, null),
+                            rs -> rs.getObject(c, LocalDateTime.class),
+                            (v, i, o) -> ((TimeStampMicroVector) v).set(i, Columns.micros((LocalDateTime) o)));
+            case Types.TIMESTAMP_WITH_TIMEZONE -> timestampWithZone(name, nullable, c);
             case Types.NULL -> spec(name, true, ArrowType.Null.INSTANCE, v -> (rs, i) -> {
             });
             default -> throw unsupported(metadata, c, name, sqlType(type), "");
         };
+    }
+
+    private static boolean zoned(ResultSetMetaData metadata, int c) throws SQLException {
+        String typeName = metadata.getColumnTypeName(c);
+        if (typeName == null) {
+            return false;
+        }
+        String lower = typeName.toLowerCase(Locale.ROOT);
+        return lower.equals("timestamptz") || lower.equals("timetz") || lower.contains("with time zone");
+    }
+
+    private static ColumnSpec<ResultSet> timestampWithZone(String name, boolean nullable, int c) {
+        return object(name, nullable, new ArrowType.Timestamp(TimeUnit.MICROSECOND, "UTC"),
+                rs -> rs.getObject(c, OffsetDateTime.class),
+                (v, i, o) -> ((TimeStampMicroTZVector) v).set(i, Columns.micros(((OffsetDateTime) o).toInstant())));
     }
 
     @FunctionalInterface
