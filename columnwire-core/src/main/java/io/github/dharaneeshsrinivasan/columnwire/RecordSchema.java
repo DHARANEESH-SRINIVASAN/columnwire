@@ -22,14 +22,14 @@ public final class RecordSchema<T extends Record> {
     };
 
     private final Class<T> type;
-    private final List<ColumnSpec> columns;
+    private final List<ColumnSpec<Record>> columns;
     private final Schema schema;
 
     private RecordSchema(Class<T> type) {
         this.type = type;
         this.columns = Columns.of(type);
         List<Field> fields = new ArrayList<>(columns.size());
-        for (ColumnSpec column : columns) {
+        for (ColumnSpec<Record> column : columns) {
             fields.add(column.field());
         }
         this.schema = new Schema(fields);
@@ -56,7 +56,7 @@ public final class RecordSchema<T extends Record> {
         return schema;
     }
 
-    List<ColumnSpec> columns() {
+    List<ColumnSpec<Record>> columns() {
         return columns;
     }
 }

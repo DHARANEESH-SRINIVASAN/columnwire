@@ -43,7 +43,7 @@ The request sends `Accept: application/vnd.apache.arrow.stream, application/json
 
 ## Values
 
-Arrow `Int64` arrives as `bigint`, dates and timestamps as epoch milliseconds, dictionary columns (Java enums) as strings, and nulls as `null`. The grid formats all of these for display.
+Arrow `Int64` arrives as `bigint`, dates and timestamps as epoch milliseconds, dictionary columns (Java enums) as strings, and nulls as `null`. SQL `DECIMAL` columns streamed with the starter's `JdbcQuery` arrive as Arrow decimals, whose `String(value)` is the unscaled integer. The grid formats all of these for display, decimals with their scale.
 
 ## License
 

@@ -88,7 +88,7 @@ The headline is the first-paint number: the grid starts drawing after the first 
 <dependency>
   <groupId>io.github.dharaneesh-srinivasan</groupId>
   <artifactId>columnwire-spring-boot-starter</artifactId>
-  <version>0.1.2</version>
+  <version>0.2.0</version>
 </dependency>
 ```
 
@@ -109,7 +109,7 @@ Stream<Order> orders() {
 }
 ```
 
-`List`, `Stream`, `Iterable`, arrays and `ResponseEntity` of records all work. Rows are encoded in batches as they are pulled from the `Stream`, so a large result is never held twice in memory.
+`List`, `Stream`, `Iterable`, arrays and `ResponseEntity` of records all work. Rows are encoded in batches as they are pulled from the `Stream`, so a large result is never held twice in memory. SQL results can skip the records entirely: see [Database queries](#database-queries).
 
 ### React
 
@@ -168,6 +168,64 @@ Primitive components are non-nullable columns. Everything else is nullable.
 
 A note for anyone wiring Arrow into Spring by hand: on Java 24 and newer, Arrow's Netty allocator (`arrow-memory-netty`) fails with a `ClassCastException` because Netty turns off its `Unsafe` path there. Columnwire uses `arrow-memory-unsafe`, which works on Java 17 through 25.
 
+## Database queries
+
+Teams that read tables with `JdbcTemplate` can stream the `ResultSet` straight into Arrow batches, without a `Map` or an object per row. Put `spring-boot-starter-jdbc` on the classpath (Columnwire only needs `spring-jdbc`, and keeps it optional) and return a `JdbcQuery`:
+
+```java
+@GetMapping("/api/orders")
+JdbcQuery orders(@RequestParam LocalDate since) {
+    return JdbcQuery.of(jdbcTemplate, "select * from orders where order_date >= ?", since);
+}
+```
+
+- **Runs while the response is written.** The query executes inside `JdbcTemplate` when the converter starts writing, and Columnwire holds one batch at a time. The `ResultSet`, statement and connection are closed when the response ends, when it fails, and when the client disconnects halfway (tested for both formats against a tracking `DataSource`).
+- **Same negotiation as records.** Arrow only for clients that ask for it, JSON for `*/*`, browsers and axios, quality values honoured, `Vary: Accept` on both, and `ResponseEntity<JdbcQuery>` keeps its headers.
+- **The JSON does not change.** Every other client gets the JSON that `jdbcTemplate.queryForList(sql)` returns from the same endpoint, byte for byte in the tests, but written one row at a time instead of after the whole list is built. This path uses Jackson 3, which Spring Boot 4 configures.
+- **Column names are the column labels**, the same keys `queryForList` uses, so aliases (`select id as "orderId"`) carry over. H2, for one, upper-cases unquoted names.
+- **Unsupported columns fail before the first byte.** A column type Arrow cannot carry yet answers `500` before anything is sent, and the log names the column and its type: `Column PAYLOAD has SQL type VARBINARY (BINARY VARYING), which Columnwire does not encode. Supported: …`. Decimals wider than 38 digits, `NUMERIC` without a precision (PostgreSQL reports `SUM`, `AVG` and plain `numeric` columns that way) and times with a time zone get a suggested `CAST`. Clients that ask for JSON are not affected.
+
+| SQL type (`java.sql.Types`) | Arrow | JavaScript value |
+|---|---|---|
+| `BOOLEAN`, `BIT(1)` | Bool | `boolean` |
+| `TINYINT`, `SMALLINT`, `INTEGER` | Int8, Int16, Int32 | `number` |
+| `BIGINT` | Int64 | `bigint` |
+| unsigned `TINYINT`, `SMALLINT`, `INTEGER`, `BIGINT` | Int16, Int32, Int64, Decimal128(20, 0) | `number`, `number`, `bigint`, Arrow decimal |
+| `REAL` | Float32 | `number` |
+| `FLOAT`, `DOUBLE` | Float64 | `number` |
+| `DECIMAL(p, s)`, `NUMERIC(p, s)`, p up to 38 | Decimal128(p, s) | Arrow decimal; `ArrowGrid` shows it with its scale |
+| `CHAR`, `VARCHAR`, `LONGVARCHAR`, `NCHAR`, `NVARCHAR`, `LONGNVARCHAR` | Utf8 | `string` |
+| `DATE` | Date32 | `number` (epoch ms) |
+| `TIME` | Time64 µs | `bigint` |
+| `TIMESTAMP` | Timestamp µs, no zone | `number` (epoch ms) |
+| `TIMESTAMP WITH TIME ZONE`, and PostgreSQL `timestamptz` (which its driver reports as `TIMESTAMP`) | Timestamp µs, UTC | `number` (epoch ms) |
+| `NULL` | Null | `null` |
+
+Columns the driver reports as `NOT NULL` are non-nullable; every other column is nullable, and SQL `NULL` arrives as `null`. `DATE`, `TIME` and `TIMESTAMP` are read as `LocalDate`, `LocalTime` and `LocalDateTime`, so Arrow carries the values stored in the database, to the microsecond. The JSON from `queryForList` goes through `java.sql.Date` and `java.sql.Timestamp` instead, which Jackson writes as UTC instants with millisecond precision, shifted by the JVM's time zone: on a JVM in `Asia/Kolkata`, `DATE '2026-01-01'` comes out as `"2025-12-31T18:30:00.000Z"`. On a JVM running in UTC the two agree to the millisecond.
+
+Whether rows really stream from the database depends on the driver. By its documentation, MySQL needs `useCursorFetch=true` with a fetch size. PostgreSQL reads the whole result into the driver unless auto-commit is off and a fetch size is set, which is what this measurement shows.
+
+**Measured on PostgreSQL 18.6** (pgjdbc 42.7.14, a local server, 1,000,000 rows of `bigint`, `integer`, `numeric(12, 2)`, `varchar` and `timestamptz`, `curl` on the same machine, second of two runs). A 15-column check of every type above, NULLs included, matched the database value for value in both setups.
+
+| Setup | Format | First byte | Whole response | Size | Server peak memory |
+|---|---|---:|---:|---:|---:|
+| Defaults | JSON | 0.58 s | 1.92 s | 111.5 MB | 1.17 GB |
+| Defaults | Arrow | 0.54 s | **0.96 s** | **55.6 MB** | (same process) |
+| `hikari.auto-commit=false`, `jdbc.template.fetch-size=1000` | JSON | 8 ms | 2.05 s | 111.5 MB | 0.44 GB |
+| `hikari.auto-commit=false`, `jdbc.template.fetch-size=1000` | Arrow | 24 ms | **1.12 s** | **55.6 MB** | (same process) |
+
+With the defaults the driver holds every row before the first one reaches Columnwire, so the first byte waits for the database either way and the gain is in total time and size. Turning auto-commit off for a whole pool changes how every other query in the application commits, so use it only for a pool that serves reads. Columnwire does not change auto-commit itself yet.
+
+**Measured: a query, JdbcTemplate to bytes** (JMH on the machine above, JDK 25.0.5, average of 6 iterations of 2 s after 4 warmups, 1 fork, `-Xmx8g`, `-prof gc`). Both sides run `SELECT * FROM orders ORDER BY id` through `JdbcTemplate` on one reused connection to an in-memory H2 2.4.240 database (`LAZY_QUERY_EXECUTION=TRUE`), over the same 11-column orders as the record benchmark, with prices as `DECIMAL(10, 2)` and `DECIMAL(12, 2)` and the creation time as `TIMESTAMP(6)`. The baseline is `queryForList` written by Jackson 3. "First 8 KiB" is the time until 8 KiB, Tomcat's default response buffer, have reached the output stream.
+
+| Rows | `queryForList` + Jackson | Columnwire `JdbcQuery` | First 8 KiB out, JSON → Arrow | Garbage per query, JSON → Arrow |
+|---:|---:|---:|---:|---:|
+| 10,000 | 23.9 ms | **5.48 ms** (4.4×) | 8.99 ms → **4.87 ms** | 23.6 MB → 4.7 MB |
+| 100,000 | 227 ms | **58.1 ms** (3.9×) | 88.5 ms → **4.66 ms** | 233 MB → 46.8 MB |
+| 1,000,000 | 3,721 ms | **603 ms** (6.2×) | 1,718 ms → **4.44 ms** | 2,335 MB → 468 MB |
+
+`queryForList` cannot send a byte before it has built a `Map` for every row, so its first bytes wait for the whole result; Columnwire's first batch of 8,192 rows was out in 4.4 to 4.9 ms at every size measured. At a million rows the error margins (99.9%) are wide: ±1,014 ms for JSON, whose million maps keep the garbage collector busy (36 collections across the measured iterations), and ±118 ms for Arrow. The garbage figures include the objects H2 itself creates while reading rows, which both sides pay. A real database adds network and server time to both columns. Raw results are in [`docs/jdbc-jmh-result.json`](docs/jdbc-jmh-result.json).
+
 ## The grid
 
 `ArrowGrid` renders only the rows in view, plus a few above and below. It reads each visible cell with `vector.get(row)` and never materializes the table. It stays usable past the browsers' maximum element height by scaling the scroll range, so the last of two million rows is still reachable. Clicking a header sorts the whole column (numbers, dates and timestamps sort on the typed array directly), clicking again reverses, and a third click clears. It exposes `role="grid"`, `aria-rowcount` and `aria-sort`, and takes `columns`, `columnWidths`, `format` and CSS variables (`--cw-border`, `--cw-header-bg`, `--cw-row-alt`) for styling.
@@ -191,6 +249,7 @@ mvn -pl columnwire-benchmark -am package -DskipTests
 cd columnwire-benchmark
 mvn -q dependency:build-classpath -Dmdep.outputFile=target/cp.txt
 java -cp "target/classes:$(cat target/cp.txt)" org.openjdk.jmh.Main EncodeBenchmark -prof gc
+java -cp "target/classes:$(cat target/cp.txt)" org.openjdk.jmh.Main JdbcBenchmark -prof gc
 java --add-opens=java.base/java.nio=ALL-UNNAMED -cp "target/classes:$(cat target/cp.txt)" \
   io.github.dharaneeshsrinivasan.columnwire.benchmark.PayloadSizes target/payloads
 cd ../js && node --expose-gc --max-old-space-size=6000 bench/parse.mjs ../columnwire-benchmark/target/payloads
@@ -200,16 +259,18 @@ Raw results from the runs above are in [`docs/`](docs).
 
 ## Tests
 
-- **Core:** round-trips every supported type through Arrow's own Java reader, checks batch splitting, empty streams, Jackson renames, and that no off-heap memory leaks.
-- **Starter:** runs against a real Tomcat on a random port: Arrow on request; JSON for `*/*`, browser and axios `Accept` headers; quality values; `Stream`, arrays and `ResponseEntity`; 50,000 rows in 50 batches; `406` for bodies Arrow cannot represent; `Vary` on both formats; the disabled switch.
-- **Contract:** a fixture written by the Java encoder is decoded in JavaScript and compared value for value with Jackson's JSON for the same records, down to microsecond timestamps.
+- **Core:** round-trips every supported type through Arrow's own Java reader, checks batch splitting, empty streams, Jackson renames, and that no off-heap memory leaks. The JDBC path does the same for every mapped SQL type from a real H2 `ResultSet`, with NULLs, decimals, column labels, the unsupported-type messages and driver errors.
+- **Starter:** runs against a real Tomcat on a random port: Arrow on request; JSON for `*/*`, browser and axios `Accept` headers; quality values; `Stream`, arrays and `ResponseEntity`; 50,000 rows in 50 batches; `406` for bodies Arrow cannot represent; `Vary` on both formats; the disabled switch. `JdbcQuery` gets the same checks on an in-memory H2 database, plus JSON compared byte for byte with `queryForList`, bound arguments, the `500` for unsupported columns, and a client that disconnects mid-stream, after which every `ResultSet`, statement and connection is closed and fewer rows were read than the query returns.
+- **Contract:** a fixture written by the Java encoder is decoded in JavaScript and compared value for value with Jackson's JSON for the same records, down to microsecond timestamps. A second fixture is written from an H2 `ResultSet` and compared with `queryForList`'s JSON for the same query, decimals digit for digit.
 - **JS:** streaming in 97-byte chunks, the JSON fallback, aborts on unmount, reading the response to the end, windowed rendering, sorting, and the two-million-row scroll cap.
 
 CI runs the Java suite on JDK 17, 21 and 25 and the JS suite on Node 22.
 
 ## Limits and roadmap
 
-- Records only for now. JavaBeans, `Map` rows from `JdbcTemplate.queryForList` and JDBC `ResultSet` streaming are next.
+- Records and JDBC queries for now. JavaBeans and `Map` rows are next.
+- JDBC: binary, LOB, UUID, array, interval and vendor-specific column types are not encoded yet (cast them in SQL). The automated tests run against H2; PostgreSQL 18.6 was checked by hand as described above; MySQL, SQL Server and Oracle drivers have not been tested yet. The JSON side of `JdbcQuery` needs Jackson 3.
+- Streaming rows from PostgreSQL without pool settings: `JdbcQuery` could open its own read-only transaction with a fetch size.
 - Nested records, lists and maps are not encoded yet (those bodies get `406` for Arrow and stay JSON).
 - Responses only. Arrow request bodies are not read.
 - Spring MVC only. WebFlux support would stream `Flux<Record>`.
@@ -218,9 +279,9 @@ CI runs the Java suite on JDK 17, 21 and 25 and the JS suite on Node 22.
 ## Layout
 
 ```
-columnwire-core/                  records → Arrow IPC stream, schema cache, type mapping
-columnwire-spring-boot-starter/   HttpMessageConverter, auto-configuration, Vary advice
-columnwire-benchmark/             JMH benchmark, payload sizes, cross-language fixtures
+columnwire-core/                  records and JDBC ResultSets → Arrow IPC stream, schema cache, type mapping
+columnwire-spring-boot-starter/   HttpMessageConverter, JdbcQuery, auto-configuration, Vary advice
+columnwire-benchmark/             JMH benchmarks, payload sizes, cross-language fixtures
 columnwire-example/               Spring Boot app used by the demo
 js/packages/columnwire/           fetchArrow, useArrow, ArrowGrid (npm: columnwire)
 js/demo/                          Vite + React comparison page
@@ -233,7 +294,7 @@ Report vulnerabilities privately, as described in [SECURITY.md](SECURITY.md). Ev
 
 ```sh
 gpg --keyserver keys.openpgp.org --recv-keys B9F051CF9545B2AB72829518908A18CEE22E2846
-gpg --verify columnwire-spring-boot-starter-0.1.2.jar.asc columnwire-spring-boot-starter-0.1.2.jar
+gpg --verify columnwire-spring-boot-starter-0.2.0.jar.asc columnwire-spring-boot-starter-0.2.0.jar
 npm audit signatures
 ```
 

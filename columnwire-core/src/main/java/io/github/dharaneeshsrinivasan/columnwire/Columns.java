@@ -55,12 +55,12 @@ final class Columns {
     private Columns() {
     }
 
-    static List<ColumnSpec> of(Class<? extends Record> type) {
+    static List<ColumnSpec<Record>> of(Class<? extends Record> type) {
         RecordComponent[] components = type.getRecordComponents();
         if (components == null) {
             throw new UnsupportedRecordException(type.getName() + " is not a record");
         }
-        List<ColumnSpec> columns = new ArrayList<>(components.length);
+        List<ColumnSpec<Record>> columns = new ArrayList<>(components.length);
         for (RecordComponent component : components) {
             Method accessor = component.getAccessor();
             if (ignored(accessor)) {
@@ -75,7 +75,8 @@ final class Columns {
         return List.copyOf(columns);
     }
 
-    private static ColumnSpec column(Class<?> owner, RecordComponent component, String name, long id, MethodHandle h) {
+    private static ColumnSpec<Record> column(Class<?> owner, RecordComponent component, String name, long id,
+                                             MethodHandle h) {
         Class<?> t = component.getType();
         if (t == boolean.class) {
             MethodHandle g = h.asType(MethodType.methodType(boolean.class, Record.class));
@@ -195,7 +196,7 @@ final class Columns {
                 + t.getName() + ", which Columnwire does not encode. Supported: " + String.join(", ", SUPPORTED));
     }
 
-    private static ColumnSpec enumColumn(String name, long id, Class<?> t, MethodHandle g) {
+    private static ColumnSpec<Record> enumColumn(String name, long id, Class<?> t, MethodHandle g) {
         Object[] constants = t.getEnumConstants();
         List<String> values = new ArrayList<>(constants.length);
         for (Object c : constants) {
@@ -205,12 +206,12 @@ final class Columns {
                 : constants.length <= Short.MAX_VALUE ? new ArrowType.Int(16, true) : new ArrowType.Int(32, true);
         DictionaryEncoding encoding = new DictionaryEncoding(id, false, index);
         Field field = new Field(name, new FieldType(true, index, encoding), null);
-        Function<FieldVector, ColumnWriter> binder = switch (index.getBitWidth()) {
+        Function<FieldVector, ColumnWriter<Record>> binder = switch (index.getBitWidth()) {
             case 8 -> v -> nullable(v, g, (vec, i, o) -> ((TinyIntVector) vec).set(i, (byte) ((Enum<?>) o).ordinal()));
             case 16 -> v -> nullable(v, g, (vec, i, o) -> ((SmallIntVector) vec).set(i, (short) ((Enum<?>) o).ordinal()));
             default -> v -> nullable(v, g, (vec, i, o) -> ((IntVector) vec).set(i, ((Enum<?>) o).ordinal()));
         };
-        return new ColumnSpec(name, field, binder, List.copyOf(values));
+        return new ColumnSpec<>(name, field, binder, List.copyOf(values));
     }
 
     @FunctionalInterface
@@ -218,16 +219,16 @@ final class Columns {
         void set(FieldVector vector, int index, Object value);
     }
 
-    private static ColumnSpec plain(String name, boolean nullable, ArrowType type,
-                                    Function<FieldVector, ColumnWriter> binder) {
-        return new ColumnSpec(name, new Field(name, new FieldType(nullable, type, null), null), binder, null);
+    private static ColumnSpec<Record> plain(String name, boolean nullable, ArrowType type,
+                                            Function<FieldVector, ColumnWriter<Record>> binder) {
+        return new ColumnSpec<>(name, new Field(name, new FieldType(nullable, type, null), null), binder, null);
     }
 
-    private static ColumnSpec boxed(String name, ArrowType type, MethodHandle g, Setter setter) {
+    private static ColumnSpec<Record> boxed(String name, ArrowType type, MethodHandle g, Setter setter) {
         return plain(name, true, type, v -> nullable(v, g, setter));
     }
 
-    private static ColumnWriter nullable(FieldVector vector, MethodHandle g, Setter setter) {
+    private static ColumnWriter<Record> nullable(FieldVector vector, MethodHandle g, Setter setter) {
         return (row, i) -> {
             Object value = (Object) g.invokeExact(row);
             if (value == null) {
@@ -238,16 +239,16 @@ final class Columns {
         };
     }
 
-    private static void utf8(VarCharVector vector, int index, String value) {
+    static void utf8(VarCharVector vector, int index, String value) {
         byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
         vector.setSafe(index, bytes, 0, bytes.length);
     }
 
-    private static long micros(LocalDateTime t) {
+    static long micros(LocalDateTime t) {
         return t.toEpochSecond(ZoneOffset.UTC) * 1_000_000L + t.getNano() / 1_000L;
     }
 
-    private static long micros(Instant t) {
+    static long micros(Instant t) {
         return t.getEpochSecond() * 1_000_000L + t.getNano() / 1_000L;
     }
 

@@ -3,7 +3,9 @@ package io.github.dharaneeshsrinivasan.columnwire.spring;
 import io.github.dharaneeshsrinivasan.columnwire.ArrowMediaTypes;
 import io.github.dharaneeshsrinivasan.columnwire.ArrowRecordEncoder;
 import io.github.dharaneeshsrinivasan.columnwire.RecordSchema;
+import io.github.dharaneeshsrinivasan.columnwire.UnsupportedRecordException;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
@@ -17,10 +19,14 @@ import org.springframework.http.MediaType;
 import org.springframework.http.converter.AbstractSmartHttpMessageConverter;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.converter.HttpMessageNotWritableException;
+import org.springframework.util.ClassUtils;
 
 public final class ArrowHttpMessageConverter extends AbstractSmartHttpMessageConverter<Object> {
 
     public static final MediaType ARROW_STREAM = MediaType.parseMediaType(ArrowMediaTypes.STREAM);
+
+    private static final boolean JDBC = ClassUtils.isPresent("org.springframework.jdbc.core.JdbcOperations",
+            ArrowHttpMessageConverter.class.getClassLoader());
 
     private final ArrowRecordEncoder encoder;
 
@@ -46,7 +52,7 @@ public final class ArrowHttpMessageConverter extends AbstractSmartHttpMessageCon
 
     @Override
     public boolean canWrite(ResolvableType type, Class<?> valueClass, MediaType mediaType) {
-        return canWrite(mediaType) && recordType(type, valueClass) != null;
+        return canWrite(mediaType) && writable(type, valueClass);
     }
 
     @Override
@@ -70,6 +76,10 @@ public final class ArrowHttpMessageConverter extends AbstractSmartHttpMessageCon
     @Override
     protected void writeInternal(Object value, ResolvableType type, HttpOutputMessage outputMessage,
                                  Map<String, Object> hints) throws IOException {
+        if (JDBC && value instanceof JdbcQuery query) {
+            encode(query, outputMessage);
+            return;
+        }
         Class<? extends Record> recordType = recordType(type, value.getClass());
         if (recordType == null) {
             throw new HttpMessageNotWritableException("Cannot encode " + type + " as Arrow");
@@ -87,6 +97,35 @@ public final class ArrowHttpMessageConverter extends AbstractSmartHttpMessageCon
     private void encode(Class<? extends Record> recordType, Iterator<?> rows, HttpOutputMessage out)
             throws IOException {
         encoder.encode((Class) recordType, (Iterator) rows, out.getBody());
+    }
+
+    private void encode(JdbcQuery query, HttpOutputMessage out) throws IOException {
+        try {
+            query.query(rows -> {
+                try {
+                    return encoder.encode(rows, out.getBody());
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            });
+        } catch (UncheckedIOException e) {
+            throw e.getCause();
+        } catch (UnsupportedRecordException e) {
+            throw new HttpMessageNotWritableException("Cannot encode " + query + " as Arrow: " + e.getMessage(), e);
+        }
+    }
+
+    static boolean writable(ResolvableType type, Class<?> valueClass) {
+        return recordType(type, valueClass) != null || jdbcQuery(type, valueClass);
+    }
+
+    private static boolean jdbcQuery(ResolvableType type, Class<?> valueClass) {
+        if (!JDBC) {
+            return false;
+        }
+        Class<?> raw = type == null ? null : type.resolve();
+        return raw != null && JdbcQuery.class.isAssignableFrom(raw)
+                || valueClass != null && JdbcQuery.class.isAssignableFrom(valueClass);
     }
 
     static Class<? extends Record> recordType(ResolvableType type, Class<?> valueClass) {
