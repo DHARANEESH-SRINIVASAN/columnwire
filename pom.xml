@@ -45,8 +45,8 @@
         <maven.compiler.release>17</maven.compiler.release>
         <maven.compiler.parameters>true</maven.compiler.parameters>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <arrow.version>19.0.0</arrow.version>
-        <spring-boot.version>4.1.2</spring-boot.version>
+        <arrow.version>20.0.0</arrow.version>
+        <spring-boot.version>4.2.0</spring-boot.version>
         <jmh.version>1.37</jmh.version>
         <arrow.jvm.base>--add-opens=java.base/java.nio=ALL-UNNAMED</arrow.jvm.base>
         <arrow.jvm.unsafe></arrow.jvm.unsafe>
@@ -145,7 +145,7 @@
                 <plugin>
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>versions-maven-plugin</artifactId>
-                    <version>2.23.0</version>
+                    <version>2.25.2</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
